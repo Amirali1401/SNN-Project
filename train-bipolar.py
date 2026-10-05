@@ -7,6 +7,14 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix, classification_report
 
+
+
+
+import os
+import json
+import joblib
+
+
 # تنظیم سید برای تکرارپذیری دقیق
 np.random.seed(42)
 tf.random.set_seed(42)
@@ -108,3 +116,32 @@ print(f"Recall   : {np.mean(rec_list):.4f}")
 print(f"F1-Score : {np.mean(f1_list):.4f}")
 print(f"ROC-AUC  : {np.mean(auc_list):.4f}")
 print("="*60)
+
+
+
+os.makedirs("bipolar_artifacts", exist_ok=True)
+
+# اگر نام مدل شما model است، از همین متغیر استفاده کنید.
+# در صورت متفاوت بودن نام متغیر، model را با نام واقعی مدل عوض کنید.
+model.save(
+    "bipolar_artifacts/bipolar_snn_model.keras"
+)
+
+joblib.dump(
+    scaler,
+    "bipolar_artifacts/bipolar_scaler.pkl"
+)
+
+with open(
+    "bipolar_artifacts/bipolar_selected_genes.json",
+    "w",
+    encoding="utf-8"
+) as f:
+    json.dump(
+        selected_genes,
+        f,
+        ensure_ascii=False,
+        indent=4
+    )
+
+print("Bipolar artifacts saved successfully.")
