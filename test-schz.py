@@ -20,23 +20,23 @@ from sklearn.metrics import (
 # تنظیمات
 # ============================================================
 
-TEST_FILE = "schizophrenia_test.csv"
+TEST_FILE = "schz_test.csv"
 
 ARTIFACT_DIR = "schizophrenia_artifacts"
 
 MODEL_PATH = os.path.join(
     ARTIFACT_DIR,
-    "schizophrenia_snn_model.keras"
+    "snn_model.keras"
 )
 
 SCALER_PATH = os.path.join(
     ARTIFACT_DIR,
-    "schizophrenia_scaler.pkl"
+    "scaler.pkl"
 )
 
 GENES_PATH = os.path.join(
     ARTIFACT_DIR,
-    "schizophrenia_selected_genes.json"
+    "selected_genes.json"
 )
 
 MODEL_INFO_PATH = os.path.join(
