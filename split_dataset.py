@@ -8,10 +8,8 @@ from sklearn.model_selection import train_test_split
 # تنظیمات
 # ============================================================
 
-# نام فایل CSV آماده‌شدهٔ خودت را اینجا بنویس
-INPUT_FILE = Path("GSE98793_series_matrix (1).csv")
+INPUT_FILE = Path("GSE98793_labeled.csv")
 
-# نام فایل‌های خروجی
 TRAIN_FILE = Path("mdd_train.csv")
 TEST_FILE = Path("mdd_test.csv")
 
