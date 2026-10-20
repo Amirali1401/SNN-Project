@@ -54,10 +54,13 @@ from sklearn.preprocessing import StandardScaler
 
 META_COLUMNS = {"sample_id", "id_ref", "group", "genotype", "treatment"}
 LABEL_ALIASES = {
-    "control": "control", "controls": "control", "ctrl": "control",
-    "healthy": "control", "0": "control",
-    "schizophrenia": "schizophrenia", "schizophrenic": "schizophrenia",
-    "scz": "schizophrenia", "1": "schizophrenia",
+    "control": "control",
+    "controls": "control",
+    "ctrl": "control",
+    "healthy": "control",
+    "0": "control",
+    "mdd": "mdd",
+    "1": "mdd",
 }
 
 def parse_args() -> argparse.Namespace:
@@ -109,7 +112,8 @@ def validate_input(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         raise SystemExit(f"ERROR: invalid labels {unknown!r}; expected "
                          "control/schizophrenia (or 0/1).")
 
-    y = y_raw.map(LABEL_ALIASES).map({"control": 0, "schizophrenia": 1})
+    y = y_raw.map(LABEL_ALIASES).map({"control": 0, "mdd": 1})
+
     if y.isna().any():
         raise SystemExit("ERROR: NaN labels found after normalization.")
 
@@ -252,7 +256,7 @@ def main() -> None:
         "n_features_total": int(X.shape[1]),
         "n_selected": len(selected_genes),
         "selected_genes": selected_genes,
-        "label_mapping": {"control": 0, "schizophrenia": 1},
+        "label_mapping": {"control": 0, "mdd": 1},
         "ignored_metadata_columns": sorted(META_COLUMNS),
         "cv_folds": args.cv_folds,
         "seed": args.seed,
