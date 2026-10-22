@@ -1,7 +1,7 @@
 {
   "task": "mdd_binary_classification",
-  "training_input": "C:\\Users\\LENO\\Desktop\\deep learning\\mdd_train.csv",
-  "genes_artifact": "C:\\Users\\LENO\\Desktop\\deep learning\\mdd_artifacts\\selected_genes.json",
+  "training_input": "/home/amirali/Desktop/SNN-Project/mdd_train.csv",
+  "genes_artifact": "/home/amirali/Desktop/SNN-Project/mdd_artifacts/selected_genes.json",
   "target_column": "Group",
   "n_train_samples": 153,
   "class_counts": {
