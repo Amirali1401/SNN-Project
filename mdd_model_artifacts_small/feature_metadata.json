@@ -1,0 +1,178 @@
+{
+  "task": "mdd_binary_classification",
+  "training_input": "C:\\Users\\LENO\\Desktop\\deep learning\\mdd_train.csv",
+  "genes_artifact": "C:\\Users\\LENO\\Desktop\\deep learning\\mdd_artifacts\\selected_genes.json",
+  "target_column": "Group",
+  "n_train_samples": 153,
+  "class_counts": {
+    "control_0": 51,
+    "mdd_1": 102
+  },
+  "n_selected": 38,
+  "selected_genes": [
+    "200772_x_at",
+    "215921_at",
+    "204970_s_at",
+    "219255_x_at",
+    "203955_at",
+    "231688_at",
+    "226733_at",
+    "225330_at",
+    "221419_s_at",
+    "216384_x_at",
+    "232859_s_at",
+    "210793_s_at",
+    "227891_s_at",
+    "206848_at",
+    "243955_at",
+    "238968_at",
+    "227194_at",
+    "212467_at",
+    "1559420_x_at",
+    "228544_s_at",
+    "213836_s_at",
+    "217266_at",
+    "242650_at",
+    "233609_at",
+    "225783_at",
+    "232513_x_at",
+    "227232_at",
+    "218006_s_at",
+    "215806_x_at",
+    "243162_at",
+    "230219_at",
+    "212804_s_at",
+    "1566558_x_at",
+    "1564514_at",
+    "204344_s_at",
+    "224867_at",
+    "230206_at",
+    "216701_at"
+  ],
+  "label_mapping": {
+    "control": 0,
+    "mdd": 1
+  },
+  "decision_threshold": 0.5,
+  "preprocessing": "SimpleImputer(strategy='median') then StandardScaler (fit on all training rows for final model)",
+  "cv": {
+    "strategy": "StratifiedKFold",
+    "n_splits": 5,
+    "shuffle": true,
+    "random_state": 42,
+    "fold_preprocessing_fit_on_fold_train_only": true,
+    "early_stopping_validation": "StratifiedShuffleSplit drawn only from each outer fold's training rows; outer validation fold used only for evaluation",
+    "early_stopping": {
+      "monitor": "val_loss",
+      "patience": 10,
+      "min_delta": 0.0,
+      "restore_best_weights": true,
+      "validation_fraction": 0.2,
+      "max_epochs": 80
+    },
+    "best_epochs": [
+      4,
+      1,
+      18,
+      8,
+      13
+    ],
+    "note": "Conditional on a fixed pre-selected gene list; optimistic for full feature selection. NOT nested CV. Independent test set untouched.",
+    "fold_metrics": {
+      "accuracy": [
+        0.7096774193548387,
+        0.6451612903225806,
+        0.7741935483870968,
+        0.8,
+        0.7666666666666667
+      ],
+      "precision": [
+        0.9230769230769231,
+        1.0,
+        0.8181818181818182,
+        0.9375,
+        0.8823529411764706
+      ],
+      "recall": [
+        0.6,
+        0.47619047619047616,
+        0.8571428571428571,
+        0.75,
+        0.75
+      ],
+      "f1": [
+        0.7272727272727273,
+        0.6451612903225806,
+        0.8372093023255814,
+        0.8333333333333334,
+        0.8108108108108109
+      ],
+      "auc": [
+        0.8136363636363636,
+        0.7142857142857143,
+        0.8285714285714286,
+        0.85,
+        0.895
+      ],
+      "balanced_accuracy": [
+        0.7545454545454545,
+        0.7380952380952381,
+        0.7285714285714285,
+        0.825,
+        0.775
+      ],
+      "specificity": [
+        0.9090909090909091,
+        1.0,
+        0.6,
+        0.9,
+        0.8
+      ],
+      "mcc": [
+        0.49362682632474875,
+        0.47619047619047616,
+        0.47079190906919977,
+        0.6141922686399942,
+        0.5232166435699436
+      ]
+    },
+    "mean": {
+      "accuracy": 0.7391397849462364,
+      "precision": 0.9122223364870423,
+      "recall": 0.6866666666666666,
+      "f1": 0.7707574928130068,
+      "auc": 0.8202987012987013,
+      "balanced_accuracy": 0.7642424242424242,
+      "specificity": 0.8418181818181818,
+      "mcc": 0.5156036247588724
+    },
+    "std": {
+      "accuracy": 0.05548053670068159,
+      "precision": 0.0603282693168633,
+      "recall": 0.13333843527653783,
+      "f1": 0.07429828800324174,
+      "auc": 0.0596892441689055,
+      "balanced_accuracy": 0.034226699943165066,
+      "specificity": 0.13649690457544336,
+      "mcc": 0.05257783671905303
+    }
+  },
+  "model": {
+    "architecture": "SELU self-normalizing neural network",
+    "layers": [
+      32,
+      16
+    ],
+    "activation": "selu",
+    "kernel_initializer": "LeCunNormal",
+    "dropout": "AlphaDropout(0.1) between hidden layers",
+    "output": "sigmoid",
+    "optimizer": "Adam",
+    "learning_rate": 0.001
+  },
+  "seed": 42,
+  "max_epochs": 80,
+  "final_epochs": 8,
+  "final_epochs_source": "rounded median of outer-fold best epochs",
+  "batch_size": 8
+}

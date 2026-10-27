@@ -21,6 +21,9 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+from sklearn.metrics import matthews_corrcoef
+
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -183,6 +186,16 @@ def evaluate_predictions(
 ) -> dict[str, Any]:
     """Calculate test metrics without fitting or training."""
 
+<<<<<<< HEAD
+=======
+def evaluate_predictions(
+    y_true: Any,
+    probabilities: Any,
+    threshold: float = THRESHOLD,
+) -> dict[str, Any]:
+    """Calculate test metrics without fitting or training."""
+
+>>>>>>> 0a5e139fda8138a1a5060108da9cab29b59424de
     y = np.asarray(y_true)
     p = np.asarray(probabilities, dtype=float)
 
@@ -260,6 +273,16 @@ def evaluate_predictions(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate saved MDD model artifacts on a labeled test CSV; no fitting or training.")
     parser.add_argument("--test", default="mdd_test.csv", help="Labeled MDD test CSV (relative paths resolve against this script).")
+<<<<<<< HEAD
+=======
+    parser.add_argument(
+    "--artifacts-dir",
+    default="mdd_model_artifacts_small",
+    help="Directory containing the saved small MDD SNN artifacts."
+)
+
+
+>>>>>>> 0a5e139fda8138a1a5060108da9cab29b59424de
     parser.add_argument("--output-dir", default="mdd_test_results", help="Directory for JSON metrics and CSV predictions.")
     parser.add_argument(
     "--artifacts-dir",
