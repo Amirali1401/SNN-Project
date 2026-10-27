@@ -53,6 +53,7 @@
     "control": 0,
     "mdd": 1
   },
+  "decision_threshold": 0.5,
   "preprocessing": "SimpleImputer(strategy='median') then StandardScaler (fit on all training rows for final model)",
   "cv": {
     "strategy": "StratifiedKFold",
@@ -60,70 +61,118 @@
     "shuffle": true,
     "random_state": 42,
     "fold_preprocessing_fit_on_fold_train_only": true,
-    "note": "Conditional on a fixed pre-selected gene list; optimistic for the full feature-selection pipeline. NOT nested CV. Independent test set untouched.",
+    "early_stopping_validation": "StratifiedShuffleSplit drawn only from each outer fold's training rows; outer validation fold used only for evaluation",
+    "early_stopping": {
+      "monitor": "val_loss",
+      "patience": 10,
+      "min_delta": 0.0,
+      "restore_best_weights": true,
+      "validation_fraction": 0.2,
+      "max_epochs": 80
+    },
+    "best_epochs": [
+      4,
+      1,
+      18,
+      8,
+      13
+    ],
+    "note": "Conditional on a fixed pre-selected gene list; optimistic for full feature selection. NOT nested CV. Independent test set untouched.",
     "fold_metrics": {
       "accuracy": [
         0.7096774193548387,
-        0.8064516129032258,
-        0.6774193548387096,
+        0.6451612903225806,
+        0.7741935483870968,
         0.8,
-        0.6666666666666666
+        0.7666666666666667
       ],
       "precision": [
-        0.7894736842105263,
-        0.8947368421052632,
-        0.7391304347826086,
-        0.8888888888888888,
-        0.7777777777777778
+        0.9230769230769231,
+        1.0,
+        0.8181818181818182,
+        0.9375,
+        0.8823529411764706
       ],
       "recall": [
+        0.6,
+        0.47619047619047616,
+        0.8571428571428571,
         0.75,
-        0.8095238095238095,
-        0.8095238095238095,
-        0.8,
-        0.7
+        0.75
       ],
       "f1": [
-        0.7692307692307693,
-        0.85,
-        0.7727272727272727,
-        0.8421052631578947,
-        0.7368421052631579
+        0.7272727272727273,
+        0.6451612903225806,
+        0.8372093023255814,
+        0.8333333333333334,
+        0.8108108108108109
       ],
       "auc": [
-        0.7772727272727273,
-        0.8523809523809525,
-        0.6857142857142857,
-        0.8150000000000001,
-        0.77
+        0.8136363636363636,
+        0.7142857142857143,
+        0.8285714285714286,
+        0.85,
+        0.895
+      ],
+      "balanced_accuracy": [
+        0.7545454545454545,
+        0.7380952380952381,
+        0.7285714285714285,
+        0.825,
+        0.775
+      ],
+      "specificity": [
+        0.9090909090909091,
+        1.0,
+        0.6,
+        0.9,
+        0.8
+      ],
+      "mcc": [
+        0.49362682632474875,
+        0.47619047619047616,
+        0.47079190906919977,
+        0.6141922686399942,
+        0.5232166435699436
       ]
     },
     "mean": {
-      "accuracy": 0.7320430107526881,
-      "precision": 0.818001525553013,
-      "recall": 0.773809523809524,
-      "f1": 0.794181082075819,
-      "auc": 0.780073593073593
+      "accuracy": 0.7391397849462364,
+      "precision": 0.9122223364870423,
+      "recall": 0.6866666666666666,
+      "f1": 0.7707574928130068,
+      "auc": 0.8202987012987013,
+      "balanced_accuracy": 0.7642424242424242,
+      "specificity": 0.8418181818181818,
+      "mcc": 0.5156036247588724
     },
     "std": {
-      "accuracy": 0.05985452746717563,
-      "precision": 0.06255519748693582,
-      "recall": 0.04301558015480465,
-      "f1": 0.0442335190532396,
-      "auc": 0.05560792951147809
+      "accuracy": 0.05548053670068159,
+      "precision": 0.0603282693168633,
+      "recall": 0.13333843527653783,
+      "f1": 0.07429828800324174,
+      "auc": 0.0596892441689055,
+      "balanced_accuracy": 0.034226699943165066,
+      "specificity": 0.13649690457544336,
+      "mcc": 0.05257783671905303
     }
   },
   "model": {
+    "architecture": "SELU self-normalizing neural network",
     "layers": [
-      64,
       32,
       16
     ],
     "activation": "selu",
-    "dropout": "AlphaDropout(0.1)",
-    "output": "sigmoid"
+    "kernel_initializer": "LeCunNormal",
+    "dropout": "AlphaDropout(0.1) between hidden layers",
+    "output": "sigmoid",
+    "optimizer": "Adam",
+    "learning_rate": 0.001
   },
   "seed": 42,
-  "epochs": 80,
+  "max_epochs": 80,
+  "final_epochs": 8,
+  "final_epochs_source": "rounded median of outer-fold best epochs",
   "batch_size": 8
 }

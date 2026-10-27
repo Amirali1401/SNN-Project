@@ -33,7 +33,9 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     roc_auc_score,
+    matthews_corrcoef,
 )
+
 
 ROOT = Path(__file__).resolve().parent
 THRESHOLD = 0.5
@@ -174,46 +176,96 @@ def validate_model_shapes(model: Any, n_features: int) -> None:
     if len(out_shape) != 2 or out_shape[-1] != 1:
         raise ValueError(f"Model output shape {out_shape} must be (batch, 1) for binary probabilities")
 
+def evaluate_predictions(
+    y_true: Any,
+    probabilities: Any,
+    threshold: float = THRESHOLD,
+) -> dict[str, Any]:
+    """Calculate test metrics without fitting or training."""
 
-def evaluate_predictions(y_true: Any, probabilities: Any, threshold: float = THRESHOLD) -> dict[str, Any]:
-    """Calculate test metrics; independently testable without TensorFlow."""
     y = np.asarray(y_true)
     p = np.asarray(probabilities, dtype=float)
+
     if y.ndim != 1 or p.ndim != 1 or len(y) != len(p) or not len(y):
-        raise ValueError("y_true and probabilities must be non-empty, equal-length 1-D arrays")
+        raise ValueError(
+            "y_true and probabilities must be non-empty, equal-length 1-D arrays"
+        )
+
     if not np.isin(y, [0, 1]).all():
         raise ValueError("y_true must contain only binary labels 0 and 1")
+
     if not np.isfinite(p).all() or ((p < 0) | (p > 1)).any():
-        raise ValueError("probabilities must be finite values in [0, 1]")
+        raise ValueError(
+            "probabilities must be finite values in [0, 1]"
+        )
+
     if not np.isfinite(threshold) or threshold != THRESHOLD:
         raise ValueError("Evaluation threshold is fixed at 0.5")
+
     y = y.astype(np.int64)
     pred = (p >= THRESHOLD).astype(np.int64)
+
     cm = confusion_matrix(y, pred, labels=[0, 1])
     counts = np.bincount(y, minlength=2)
     two_classes = bool(np.all(counts > 0))
+
     result: dict[str, Any] = {
         "accuracy": float(accuracy_score(y, pred)),
-        "precision": float(precision_score(y, pred, zero_division=0)),
-        "recall": float(recall_score(y, pred, zero_division=0)),
-        "f1": float(f1_score(y, pred, zero_division=0)),
-        "roc_auc": float(roc_auc_score(y, p)) if two_classes else None,
-        "roc_auc_reason": None if two_classes else "ROC AUC is undefined because the test set contains only one class.",
-        "balanced_accuracy": float(balanced_accuracy_score(y, pred)) if two_classes else None,
-        "specificity": float(cm[0, 0] / counts[0]) if counts[0] else None,
+        "precision": float(
+            precision_score(y, pred, zero_division=0)
+        ),
+        "recall": float(
+            recall_score(y, pred, zero_division=0)
+        ),
+        "f1": float(
+            f1_score(y, pred, zero_division=0)
+        ),
+        "mcc": float(
+            matthews_corrcoef(y, pred)
+        ),
+        "roc_auc": (
+            float(roc_auc_score(y, p))
+            if two_classes
+            else None
+        ),
+        "roc_auc_reason": (
+            None
+            if two_classes
+            else
+            "ROC AUC is undefined because the test set contains only one class."
+        ),
+        "balanced_accuracy": (
+            float(balanced_accuracy_score(y, pred))
+            if two_classes
+            else None
+        ),
+        "specificity": (
+            float(cm[0, 0] / counts[0])
+            if counts[0]
+            else None
+        ),
         "confusion_matrix": cm.astype(int).tolist(),
         "confusion_matrix_labels": [0, 1],
-        "sample_counts": {"total": int(len(y)), "control_0": int(counts[0]), "mdd_1": int(counts[1])},
+        "sample_counts": {
+            "total": int(len(y)),
+            "control_0": int(counts[0]),
+            "mdd_1": int(counts[1]),
+        },
         "threshold": THRESHOLD,
     }
+
     return result
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate saved MDD model artifacts on a labeled test CSV; no fitting or training.")
     parser.add_argument("--test", default="mdd_test.csv", help="Labeled MDD test CSV (relative paths resolve against this script).")
-    parser.add_argument("--artifacts-dir", default="mdd_model_artifacts", help="Directory containing the six saved MDD artifacts.")
     parser.add_argument("--output-dir", default="mdd_test_results", help="Directory for JSON metrics and CSV predictions.")
+    parser.add_argument(
+    "--artifacts-dir",
+    default="mdd_model_artifacts_small",
+    help="Directory containing the saved small MDD SNN artifacts."
+)
     parser.add_argument("--target-column", default=None, help="Target column; otherwise metadata target_column or a unique known alias is used.")
     parser.add_argument("--batch-size", type=int, default=32, help="Prediction batch size (>= 1).")
     args = parser.parse_args(argv)
