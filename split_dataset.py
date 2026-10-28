@@ -8,10 +8,10 @@ from sklearn.model_selection import train_test_split
 # تنظیمات
 # ============================================================
 
-INPUT_FILE = Path("GSE98793_labeled.csv")
+INPUT_FILE = Path("")
 
-TRAIN_FILE = Path("mdd_train.csv")
-TEST_FILE = Path("mdd_test.csv")
+TRAIN_FILE = Path("combined_train.csv")
+TEST_FILE = Path("combined_test.csv")
 
 # نسبت دادهٔ تست
 TEST_SIZE = 0.20
