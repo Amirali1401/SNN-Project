@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Train an MDD-only SELU self-normalizing neural network (SNN).
+"""Train an MDD-only SELU self-normalizing neural network (SNN) with optional SMOTE augmentation.
 
 WARNING: selected genes may have been selected earlier using the FULL training
 set. CV is therefore conditional on that fixed gene list and can be optimistic
 for the complete feature-selection pipeline; this is NOT nested CV. This script
 uses training data only and never loads an independent test set.
 
-Run from the project root (relative paths resolve against this script):
-    python train_mdd_small_snn.py --train mdd_train.csv \\
-        --genes mdd_artifacts/selected_genes.json --epochs 80 --batch-size 8
+Run from the project root:
+    python train_mdd_small_snn.py --train mdd_train.csv \
+        --genes mdd_artifacts/selected_genes.json --epochs 80 --batch-size 8 --use-smote
 """
 from __future__ import annotations
 
@@ -25,12 +25,12 @@ from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
+    confusion_matrix,
     f1_score,
     matthews_corrcoef,
     precision_score,
     recall_score,
     roc_auc_score,
-    confusion_matrix,
 )
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 from sklearn.preprocessing import StandardScaler
@@ -180,6 +180,25 @@ def preprocess_fit(train_x: pd.DataFrame, other_x: pd.DataFrame | None = None):
     return train_scaled, scaler.transform(imputer.transform(other_x)), imputer, scaler
 
 
+def apply_smote_if_enabled(
+    x_train: np.ndarray, y_train: np.ndarray, use_smote: bool, smote_k_neighbors: int, seed: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Safely apply SMOTE only to training partitions."""
+    if not use_smote:
+        return x_train, y_train
+
+    from imblearn.over_sampling import SMOTE
+
+    counts = np.bincount(y_train, minlength=2)
+    min_samples = counts.min()
+    # k_neighbors cannot exceed minority_samples - 1
+    effective_k = min(smote_k_neighbors, max(1, min_samples - 1))
+    
+    smote = SMOTE(k_neighbors=effective_k, random_state=seed)
+    x_resampled, y_resampled = smote.fit_resample(x_train, y_train)
+    return x_resampled, y_resampled
+
+
 def class_weights(y: np.ndarray) -> dict[int, float]:
     weights = compute_class_weight(class_weight="balanced", classes=np.array([0, 1], dtype=np.int64), y=y)
     return {int(c): float(w) for c, w in zip([0, 1], weights)}
@@ -215,8 +234,9 @@ def run_cv(
     )
     metrics: dict[str, list[float]] = {key: [] for key in metric_names}
     best_epochs: list[int] = []
-    print(f"\n{args.cv_folds}-fold stratified CV (fold-local preprocessing and inner early-stopping validation):")
+    print(f"\n{args.cv_folds}-fold stratified CV (fold-local preprocessing, SMOTE={args.use_smote}, and inner early-stopping validation):")
     print("NOTE: CV is conditional on the fixed pre-selected gene list; it may be optimistic for the full feature-selection pipeline.")
+    
     for fold, (train_idx, val_idx) in enumerate(splitter.split(raw_features, y), 1):
         x_outer_train = raw_features.iloc[train_idx]
         y_outer_train, y_outer_val = y[train_idx], y[val_idx]
@@ -234,19 +254,27 @@ def run_cv(
                 f"Fold {fold}: validation_fraction={args.validation_fraction} leaves a class absent from an inner partition."
             )
 
+        # 1. Scale on inner train, transform inner val
         x_inner_train, x_inner_val, inner_imputer, inner_scaler = preprocess_fit(x_inner_train_raw, x_inner_val_raw)
-        # Transform outer validation with the inner-training-only preprocessing; it is never used for stopping.
+        
+        # 2. Apply SMOTE ONLY on scaled inner-train fold (Validation is NEVER resampled)
+        x_inner_train_res, y_inner_train_res = apply_smote_if_enabled(
+            x_inner_train, y_inner_train, args.use_smote, args.smote_k_neighbors, args.seed + fold - 1
+        )
+
+        # Transform outer validation with inner preprocessing
         x_outer_val = inner_scaler.transform(inner_imputer.transform(raw_features.iloc[val_idx]))
+        
         model = build_snn_model(len(raw_features.columns), args.seed + fold - 1, tf, args.hidden_layers)
         callback = tf.keras.callbacks.EarlyStopping(
             monitor="val_loss", patience=args.early_stopping_patience,
             min_delta=args.early_stopping_min_delta, mode="min", restore_best_weights=True,
         )
         history = model.fit(
-            x_inner_train, y_inner_train,
+            x_inner_train_res, y_inner_train_res,
             validation_data=(x_inner_val, y_inner_val),
             epochs=args.epochs, batch_size=args.batch_size, verbose=0,
-            class_weight=class_weights(y_inner_train), callbacks=[callback],
+            class_weight=class_weights(y_inner_train_res), callbacks=[callback],
         )
         val_losses = history.history.get("val_loss", [])
         best_epoch = int(np.argmin(val_losses) + 1) if val_losses else int(len(history.epoch))
@@ -259,6 +287,7 @@ def run_cv(
         print(f"Fold {fold} (best epoch={best_epoch}): " + " | ".join(f"{k.upper()}={v:.4f}" for k, v in values.items()))
         del inner_imputer, inner_scaler
         tf.keras.backend.clear_session()
+        
     print("Best epochs by fold: " + ", ".join(map(str, best_epochs)))
     print("CV mean ± std: " + " | ".join(f"{k.upper()}={np.mean(v):.4f} ± {np.std(v):.4f}" for k, v in metrics.items()))
     return metrics, best_epochs
@@ -283,6 +312,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Inner stratified validation fraction within each outer training fold (0,1).")
     parser.add_argument("--final-epochs", type=int, default=None,
                         help="Override final-model epochs; default is rounded median best CV epoch.")
+    # SMOTE options
+    parser.add_argument("--use-smote", action="store_true", default=False,
+                        help="Apply SMOTE data augmentation to training partitions.")
+    parser.add_argument("--smote-k-neighbors", type=int, default=3,
+                        help="Number of nearest neighbours to used for SMOTE (default: 3).")
     return parser.parse_args(argv)
 
 
@@ -299,6 +333,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--final-epochs must be >= 1 when provided.")
     if not args.hidden_layers or any(units < 1 for units in args.hidden_layers):
         raise ValueError("--hidden-layers must contain one or more positive integers.")
+    if args.smote_k_neighbors < 1:
+        raise ValueError("--smote-k-neighbors must be >= 1.")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -314,9 +350,16 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Training input: {train_path}")
     print(f"Target column: {target_col} | samples: {len(y)} | selected genes: {len(genes)}")
     print(f"Selected genes artifact: {genes_path}")
+    print(f"Data Augmentation (SMOTE): {args.use_smote} (k_neighbors={args.smote_k_neighbors})")
     counts = np.bincount(y, minlength=2)
     print(f"Class counts: control(0)={counts[0]} mdd(1)={counts[1]}")
     print("WARNING: genes were selected earlier using the full training set, so CV is conditional on a fixed gene list and may be optimistic. The independent test set remains untouched.")
+
+    if args.use_smote:
+        try:
+            import imblearn  # noqa: F401
+        except ImportError as exc:
+            raise RuntimeError("imbalanced-learn is required when --use-smote is set. Run: pip install imbalanced-learn") from exc
 
     try:
         import tensorflow as tf
@@ -334,11 +377,18 @@ def main(argv: list[str] | None = None) -> int:
     if final_epochs is None:
         median_best = float(np.median(best_epochs))
         final_epochs = max(1, int(np.floor(median_best + 0.5)))
+        
     final_x, imputer, scaler = preprocess_fit(selected)
+    
+    # Apply SMOTE to the final training set if requested
+    final_x_train, final_y_train = apply_smote_if_enabled(
+        final_x, y, args.use_smote, args.smote_k_neighbors, args.seed
+    )
+
     final_model = build_snn_model(len(genes), args.seed, tf, args.hidden_layers)
     final_model.fit(
-        final_x, y, epochs=final_epochs, batch_size=args.batch_size, verbose=1,
-        class_weight=class_weights(y),
+        final_x_train, final_y_train, epochs=final_epochs, batch_size=args.batch_size, verbose=1,
+        class_weight=class_weights(final_y_train),
     )
 
     label_mapping = {"control": 0, "mdd": 1}
@@ -358,6 +408,8 @@ def main(argv: list[str] | None = None) -> int:
         "target_column": target_col,
         "n_train_samples": int(len(y)),
         "class_counts": {"control_0": int(counts[0]), "mdd_1": int(counts[1])},
+        "smote_applied": bool(args.use_smote),
+        "smote_k_neighbors": int(args.smote_k_neighbors) if args.use_smote else None,
         "n_selected": len(genes),
         "selected_genes": genes,
         "label_mapping": label_mapping,

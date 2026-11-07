@@ -1,0 +1,36 @@
+{
+  "accuracy": 0.5897435897435898,
+  "precision": 0.7083333333333334,
+  "recall": 0.6538461538461539,
+  "f1": 0.68,
+  "mcc": 0.1118033988749895,
+  "roc_auc": 0.6715976331360947,
+  "roc_auc_reason": null,
+  "balanced_accuracy": 0.5576923076923077,
+  "specificity": 0.46153846153846156,
+  "confusion_matrix": [
+    [
+      6,
+      7
+    ],
+    [
+      9,
+      17
+    ]
+  ],
+  "confusion_matrix_labels": [
+    0,
+    1
+  ],
+  "sample_counts": {
+    "total": 39,
+    "control_0": 13,
+    "mdd_1": 26
+  },
+  "threshold": 0.5,
+  "test_csv": "C:\\Users\\LENO\\Desktop\\deep learning\\mdd_test.csv",
+  "artifacts_dir": "C:\\Users\\LENO\\Desktop\\deep learning\\mdd_model_artifacts",
+  "target_column": "Group",
+  "n_selected": 38,
+  "coerced_gene_values_to_missing": 0
+}
