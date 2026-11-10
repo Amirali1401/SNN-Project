@@ -1,167 +1,194 @@
-
 import json
-from pathlib import Path
 import warnings
+from pathlib import Path
 import joblib
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import shap
 import tensorflow as tf
 
+# نادیده گرفتن هشدارهای غیرضروری
 warnings.filterwarnings("ignore")
 
 # =========================================================
-# ۱. تنظیمات مسیرها (همه به صورت Path آبجکت با r-string)
+# ۱. تنظیمات مسیرها (با استفاده از شیء Path و رشته خام r)
 # =========================================================
-BASE_DIR = Path(__file__).parent
-
-# حتماً دور تمام این مسیرها تابع Path(...) قرار داشته باشد
-TEST_PATH = Path(r"C:\Users\LENO\Desktop\deep learning\Top - 100 - Bipolar.csv")
-BACKGROUND_PATH = Path(r"C:\Users\LENO\Desktop\deep learning\snn_train_input.csv")
-OUTPUT_DIR = Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_shap_results")
+BASE_DIR = Path(r"C:\Users\LENO\Desktop\deep learning")
+TEST_PATH = BASE_DIR / "Top - 100 - Bipolar.csv"
+BACKGROUND_PATH = BASE_DIR / "snn_train_input.csv"
+OUTPUT_DIR = BASE_DIR / "bipolar_shap_results"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 RANDOM_SEED = 42
 BACKGROUND_SIZE = 30
 TARGET_CLASS_INDEX = 1
 
+print("--- در حال آغاز پایپ‌لاین تحلیل SHAP برای مدل دوقطبی ---")
 
 # =========================================================
-# ۲. بارگذاری دقیق و هوشمند مصنوعات (با مسیرهای r-string)
+# ۲. بارگذاری ژن‌های منتخب (Selected Genes)
 # =========================================================
-print(f"در حال جستجو و بارگذاری مصنوعات در: {BASE_DIR.resolve()}")
-
-# الف) فایل ژن‌های برگزیده (۳۸ ژن دوقطبی)
-gene_candidates = [
-    Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_artifacts\bipolar_selected_genes.json"),
+genes_candidates = [
+    BASE_DIR / "selected_genes.json",
     BASE_DIR / "selected_genes-(2).json",
-    BASE_DIR / "selected_genes.csv"
+    BASE_DIR / "bipolar_artifacts" / "selected_genes.json",
+    BASE_DIR / "selected_genes.csv",
+    BASE_DIR / "bipolar_artifacts" / "selected_genes.csv",
 ]
-selected_genes_path = next((p for p in gene_candidates if p.exists()), None)
 
-if selected_genes_path is None:
-    raise FileNotFoundError("فایل ژن‌های برگزیده دوقطبی یافت نشد.")
+selected_genes = None
+for candidate in genes_candidates:
+    if candidate.exists():
+        print(f"بارگذاری ژن‌ها از: {candidate.name}")
+        if candidate.suffix == ".json":
+            with open(candidate, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                selected_genes = data.get("selected_genes", data) if isinstance(data, dict) else data
+        elif candidate.suffix == ".csv":
+            df_g = pd.read_csv(candidate)
+            col = "selected_genes" if "selected_genes" in df_g.columns else df_g.columns[0]
+            selected_genes = df_g[col].dropna().tolist()
+        break
 
-print(f"-> فایل ژن‌ها از این مسیر بارگذاری شد: {selected_genes_path}")
+if not selected_genes:
+    raise FileNotFoundError("فایل ژن‌های منتخب (selected_genes) در مسیرهای مشخص‌شده یافت نشد.")
 
-if selected_genes_path.suffix == ".json":
-    with open(selected_genes_path, "r", encoding="utf-8") as f:
-        loaded_genes = json.load(f)
-    if isinstance(loaded_genes, dict):
-        selected_genes = (
-            loaded_genes.get("selected_genes")
-            or loaded_genes.get("features")
-            or loaded_genes.get("genes")
-        )
-    else:
-        selected_genes = list(loaded_genes)
-else:
-    df_genes = pd.read_csv(selected_genes_path)
-    col = next((c for c in ["gene", "probe", "features"] if c in df_genes.columns), df_genes.columns[-1])
-    selected_genes = df_genes[col].astype(str).tolist()
+print(f"تعداد {len(selected_genes)} ژن با موفقیت لود شدند.")
 
-print(f"تعداد ژن‌های بارگذاری‌شده: {len(selected_genes)}")
-
-# ب) مسیرهای مدل، اسکیلر و ایمپیتر با r-string
+# =========================================================
+# ۳. بارگذاری مصنوعات (مدل، اسکیلر، ایمپیتر)
+# =========================================================
+# =========================================================
+# ۳. بارگذاری مصنوعات (مدل، اسکیلر، ایمپیتر)
+# =========================================================
 model_candidates = [
     Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_artifacts\bipolar_snn_model.keras"),
     Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_artifacts\snn_model.keras"),
+    BASE_DIR / "bipolar_artifacts" / "bipolar_snn_model.keras",
+    BASE_DIR / "bipolar_artifacts" / "snn_model.keras",
     BASE_DIR / "snn_model.keras",
 ]
+
 scaler_candidates = [
-    Path(r"C:\Users\LENO\Desktop\deep learning\scaler-(2).pkl"),
-    Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_artifacts\scaler-(2).pkl"),
+    Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_artifacts\bipolar_scaler.pkl"),
+    Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_artifacts\scaler.pkl"),
     BASE_DIR / "scaler-(2).pkl",
     BASE_DIR / "scaler.pkl",
+    BASE_DIR / "bipolar_artifacts" / "scaler.pkl",
 ]
+
 imputer_candidates = [
-    Path(r"C:\Users\LENO\Desktop\deep learning\imputer-(2).pkl"),
-    Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_artifacts\imputer-(2).pkl"),
+    Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_artifacts\bipolar_imputer.pkl"),
+    Path(r"C:\Users\LENO\Desktop\deep learning\bipolar_artifacts\imputer.pkl"),
     BASE_DIR / "imputer-(2).pkl",
     BASE_DIR / "imputer.pkl",
+    BASE_DIR / "bipolar_artifacts" / "imputer.pkl",
 ]
+
+# پیدا کردن اولین مسیر معتبر
+model_path = next((p for p in model_candidates if p.exists()), None)
+scaler_path = next((p for p in scaler_candidates if p.exists()), None)
+imputer_path = next((p for p in imputer_candidates if p.exists()), None)
+
+if not model_path:
+    raise FileNotFoundError(
+        "فایل مدل کراس در هیچ‌یک از مسیرها پیدا نشد!\n"
+        f"مسیرهای بررسی‌شده:\n" + "\n".join(str(p) for p in model_candidates)
+    )
+
+print(f"بارگذاری مدل از: {model_path}")
+model = tf.keras.models.load_model(model_path)
+
+scaler = joblib.load(scaler_path) if scaler_path else None
+imputer = joblib.load(imputer_path) if imputer_path else None
+
+if scaler_path:
+    print(f"بارگذاری اسکیلر از: {scaler_path.name}")
+if imputer_path:
+    print(f"بارگذاری ایمپیتر از: {imputer_path.name}")
 
 model_path = next((p for p in model_candidates if p.exists()), None)
 scaler_path = next((p for p in scaler_candidates if p.exists()), None)
 imputer_path = next((p for p in imputer_candidates if p.exists()), None)
 
 if not model_path:
-    raise FileNotFoundError("فایل مدل snn_model.keras پیدا نشد.")
+    raise FileNotFoundError("فایل مدل snn_model.keras یافت نشد.")
 
-print(f"-> فایل مدل بارگذاری شد: {model_path}")
+print(f"بارگذاری مدل از: {model_path.name}")
 model = tf.keras.models.load_model(model_path)
-scaler = joblib.load(scaler_path) if scaler_path and scaler_path.exists() else None
-imputer = joblib.load(imputer_path) if imputer_path and imputer_path.exists() else None
 
+scaler = joblib.load(scaler_path) if scaler_path else None
+imputer = joblib.load(imputer_path) if imputer_path else None
+
+# =======================================================
 # =========================================================
-# ۳. بارگذاری و پیش‌پردازش داده‌های تست
+# ۴. آماده‌سازی داده‌های تست و پس‌زمینه (نسخه مقاوم و اصلاح‌شده)
 # =========================================================
 if not TEST_PATH.exists():
-    raise FileNotFoundError(f"فایل داده تست پیدا نشد: {TEST_PATH}")
+    raise FileNotFoundError(f"فایل تست در مسیر {TEST_PATH} یافت نشد.")
 
 df_test = pd.read_csv(TEST_PATH)
-print(f"ابعاد داده تست بارگذاری‌شده: {df_test.shape}")
 
-# بررسی وجود ژن‌ها در داده تست
-missing_genes = [g for g in selected_genes if g not in df_test.columns]
-if missing_genes:
-    raise KeyError(f"این ژن‌ها در داده تست موجود نیستند: {missing_genes}")
+# استخراج ستون‌های داده و حذف ستون‌های غیرضروری احتمالی (مثل sample_id یا Group)
+for col_to_drop in ["sample_id", "Group", "ID_REF"]:
+    if col_to_drop in df_test.columns and col_to_drop not in selected_genes:
+        # اگر ستون هدف در داده تست هست اما جزء ژن‌ها نیست، موقتاً نگه میداریم یا جدا میکنیم
+        pass
 
-X_raw = df_test[selected_genes].copy().apply(pd.to_numeric, errors="coerce")
+# تضمین اینکه دقیقاً همان ژن‌های منتخب مدل (معمولاً ۳۸ ژن) با همان ترتیب استخراج شوند
+missing_in_test = [g for g in selected_genes if g not in df_test.columns]
+if missing_in_test:
+    print(f"هشدار: این ژن‌ها در فایل تست نبودند و مقدار صفر در نظر گرفته می‌شوند: {missing_in_test}")
+    for g in missing_in_test:
+        df_test[g] = 0.0
 
-if imputer is not None:
-    X_imputed = imputer.transform(X_raw)
-else:
-    X_imputed = X_raw.fillna(X_raw.median()).values
+# فیلتر کردن دقیق دی‌اف تست روی selected_genes به همان ترتیبی که مدل آموزش دیده
+X_test_raw = df_test[selected_genes].copy()
+X_test_raw = X_test_raw.apply(pd.to_numeric, errors="coerce").fillna(0)
 
-if scaler is not None:
-    X_processed = scaler.transform(X_imputed)
-else:
-    X_processed = X_imputed
+# اعمال ایمپیتر و اسکیلر با بررسی ابعاد
+try:
+    if imputer:
+        X_test_imp = imputer.transform(X_test_raw)
+    else:
+        X_test_imp = X_test_raw.values
+
+    if scaler:
+        X_processed = scaler.transform(X_test_imp)
+    else:
+        X_processed = X_test_imp
+except Exception as e:
+    print(f"خطا در اعمال Scaler یا Imputer: {e}")
+    # روش جایگزین اضطراری اگر ابعاد اسکیلر با ستون‌ها نخواند
+    X_processed = X_test_raw.values
 
 X_processed = np.asarray(X_processed, dtype=np.float32)
 
-# =========================================================
-# ۴. تعریف تابع پیش‌بینی و محاسبه مقادیر SHAP
-# =========================================================
-def model_predict(data):
-    preds = model.predict(data, verbose=0)
-    if preds.shape[1] == 1:
-        return np.hstack([1 - preds, preds])
-    return preds
-
-if BACKGROUND_PATH and BACKGROUND_PATH.exists():
+# آماده‌سازی داده پس‌زمینه (Background)
+if BACKGROUND_PATH.exists():
+    print(f"در حال ساخت دیتای پس‌زمینه از: {BACKGROUND_PATH.name}")
     df_bg = pd.read_csv(BACKGROUND_PATH)
-    X_bg_raw = df_bg[[g for g in selected_genes if g in df_bg.columns]].copy().apply(pd.to_numeric, errors="coerce")
-    X_bg_imp = imputer.transform(X_bg_raw) if imputer else X_bg_raw.fillna(X_bg_raw.median()).values
-    X_bg = scaler.transform(X_bg_imp) if scaler else X_bg_imp
-    background_data = shap.maskers.Independent(np.asarray(X_bg, dtype=np.float32), max_samples=BACKGROUND_SIZE)
+    
+    # اطمینان از وجود ستون‌های ژن در پس‌زمینه
+    bg_cols = [g for g in selected_genes if g in df_bg.columns]
+    X_bg_raw = df_bg[bg_cols].copy().apply(pd.to_numeric, errors="coerce").fillna(0)
+    
+    # اگر تعداد ستون‌ها کامل بود از ایمپیتر اصلی استفاده کن
+    try:
+        X_bg_imp = imputer.transform(X_bg_raw) if imputer else X_bg_raw.values
+        X_bg_scaled = scaler.transform(X_bg_imp) if scaler else X_bg_imp
+    except:
+        X_bg_scaled = X_bg_raw.values
+
+    sample_size = min(BACKGROUND_SIZE, len(X_bg_scaled))
+    background_data = np.asarray(X_bg_scaled[:sample_size], dtype=np.float32)
 else:
-    background_data = shap.maskers.Independent(X_processed[:BACKGROUND_SIZE], max_samples=BACKGROUND_SIZE)
+    sample_size = min(BACKGROUND_SIZE, len(X_processed))
+    background_data = np.asarray(X_processed[:sample_size], dtype=np.float32)
 
-print("در حال محاسبه مقادیر SHAP برای مدل دوقطبی (لطفاً کمی صبر کنید)...")
-explainer = shap.KernelExplainer(model_predict, background_data)
-shap_values = explainer.shap_values(X_processed, nsamples="auto")
+print(f"ابعاد داده‌های پردازش‌شده تست: {X_processed.shape}")
+print(f"ابعاد ماتریس پس‌زمینه (Background Shape): {background_data.shape}")
 
-if isinstance(shap_values, list):
-    sv_target = shap_values[TARGET_CLASS_INDEX]
-else:
-    sv_target = shap_values
-
-# =========================================================
-# ۵. ذخیره و چاپ نتایج رتبه‌بندی ژن‌ها
-# =========================================================
-mean_abs_shap = np.mean(np.abs(sv_target), axis=0)
-gene_importance_df = pd.DataFrame({
-    "gene": selected_genes,
-    "mean_abs_shap": mean_abs_shap
-}).sort_values(by="mean_abs_shap", ascending=False).reset_index(drop=True)
-
-gene_importance_df["rank"] = gene_importance_df.index + 1
-
-importance_csv_path = OUTPUT_DIR / "bipolar_shap_feature_importance.csv"
-gene_importance_df.to_csv(importance_csv_path, index=False, encoding="utf-8-sig")
-
-print("\n--- ۱۰ ژن برتر تأثیرگذار در مدل دوقطبی (بر اساس SHAP) ---")
-print(gene_importance_df.head(10))
-print(f"\n📁 نتایج با موفقیت ذخیره شد در مسیر:\n{OUTPUT_DIR.resolve()}")
+# تعیین متغیر valid_genes برای استفاده در مراحل بعدی
+valid_genes = selected_genes
