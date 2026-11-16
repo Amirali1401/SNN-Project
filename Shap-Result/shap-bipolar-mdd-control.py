@@ -27,22 +27,27 @@ def locate(*paths):
     )
 
 
-CSV_PATH = locate("merged_MDD_Bipolar_100probes_labeled.csv")
-NPZ_PATH = locate("preprocessed_data.npz")
-JSON_PATH = locate(
-    "selected_features.json",
-    "fs_artifacts/selected_features.json",
-)
-MODEL_PATH = locate(
-    "best_snn_model.keras",
-    "snn_results/best_snn_model.keras",
-)
-REFERENCE_PATH = locate(
-    "test_predictions.npz",
-    "snn_results/test_predictions.npz",
-)
+CSV_PATH = locate( r"C:\Users\LENO\Desktop\deep learning\merged_MDD_Bipolar_100probes_labeled.csv")
+NPZ_PATH = locate( r"C:\Users\LENO\Desktop\deep learning\preprocessed_data.npz")
 
-# خواندن مشخصات و آرایه‌های ذخیره‌شده
+
+from pathlib import Path
+
+PROJECT_ROOT = Path(r"C:\Users\LENO\Desktop\deep learning")
+
+JSON_PATH = PROJECT_ROOT / "fs_artifacts" / "selected_features.json"
+MODEL_PATH = PROJECT_ROOT / "snn_results" / "best_snn_model.keras"
+REFERENCE_PATH = PROJECT_ROOT / "snn_results" / "test_predictions.npz"
+
+for name, path in {
+    "JSON": JSON_PATH,
+    "MODEL": MODEL_PATH,
+    "REFERENCE": REFERENCE_PATH,
+}.items():
+    print(f"{name}: {path} — exists: {path.is_file()}")
+    if not path.is_file():
+        raise FileNotFoundError(f"{name} file not found: {path}")
+
 with JSON_PATH.open(encoding="utf-8") as f:
     metadata = json.load(f)
 
